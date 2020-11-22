@@ -1,0 +1,103 @@
+
+import pandas as pd
+import numpy as np
+import requests
+import json
+import csv
+import time
+import datetime
+import calendar
+import os
+from bs4 import BeautifulSoup as bs
+
+#standard web crawing process
+def get_webmsg1(start_date_y, start_date_m, start_date_d, end_date_y, end_date_m, end_date_d, stock_id):
+    while True:
+        try:
+            start_date = str(int(datetime.datetime(start_date_y, start_date_m, start_date_d).replace(tzinfo=datetime.timezone.utc).timestamp()))
+            end_date = str(int(datetime.datetime(end_date_y, end_date_m, end_date_d).replace(tzinfo=datetime.timezone.utc).timestamp()))
+            sid = str(stock_id)
+            url_1 = 'https://ws.api.cnyes.com/ws/api/v1/charting/history?resolution=D&symbol=TWS:'+sid+':STOCK&from='+end_date+'&to='+start_date+'&quote=1'
+            res1 = requests.get(url_1)
+            soup1 = bs(res1.text, 'html.parser')
+            smt1 = json.loads(soup1.text)     #convert data into json
+            return smt1
+            break
+        except Exception:
+            pass
+
+def get_webmsg2(start_date_y, start_date_m, start_date_d, end_date_y, end_date_m, end_date_d, stock_id):
+    while True:
+        try:
+            start_date = str(int(datetime.datetime(start_date_y, start_date_m, start_date_d).replace(tzinfo=datetime.timezone.utc).timestamp()))
+            end_date = str(int(datetime.datetime(end_date_y, end_date_m, end_date_d).replace(tzinfo=datetime.timezone.utc).timestamp()))
+            sid = str(stock_id)
+            url_2 = 'https://marketinfo.api.cnyes.com/mi/api/v1/investors/buysell/TWS%3A'+sid+'%3ASTOCK?from='+end_date+'&to='+start_date
+            res2 = requests.get(url_2)
+            soup2 = bs(res2.text, 'html.parser')
+            smt2 = json.loads(soup2.text)
+            return smt2
+            break
+        except Exception:
+            pass
+
+def get_webmsg3(start_date_y, start_date_m, start_date_d, end_date_y, end_date_m, end_date_d, stock_id):
+    while True:
+        try:
+            start_date = str(int(datetime.datetime(start_date_y, start_date_m, start_date_d).replace(tzinfo=datetime.timezone.utc).timestamp()))
+            end_date = str(int(datetime.datetime(end_date_y, end_date_m, end_date_d).replace(tzinfo=datetime.timezone.utc).timestamp()))
+            sid = str(stock_id)
+            url_3 = 'https://marketinfo.api.cnyes.com/mi/api/v1/TWS:'+sid+':STOCK/marginTrading?from='+end_date+'&to='+start_date
+            res3 = requests.get(url_3)
+            soup3 = bs(res3.text, 'html.parser')
+            smt3 = json.loads(soup3.text)
+            return smt3
+            break
+        except Exception:
+            pass
+
+def Update_all_stock(start_date_y, start_date_m, start_date_d, end_date_y, end_date_m, end_date_d):
+    stocklist = pd.read_csv(r'/home/justin/Documents/Stocks/Stock_data/StockList.csv')
+    stock_list = list(stocklist['Code'])
+    for stock in stock_list:
+        while True:
+            try:
+                smt1 = get_webmsg1(start_date_y, start_date_m, start_date_d, end_date_y, end_date_m, end_date_d, stock)
+                smt2 = get_webmsg2(start_date_y, start_date_m, start_date_d, end_date_y, end_date_m, end_date_d, stock)
+                smt3 = get_webmsg3(start_date_y, start_date_m, start_date_d, end_date_y, end_date_m, end_date_d, stock)
+                df_columns = dict({'t':'Time', 'o':'Open', 'h':'High', 'l':'Low', 'c':'Close', 'v':'Volume', 'Net_Margin':'Net_Margin', 'foreignNetBuySellVolume':'Foreign_Net_Volume', 'domesticNetBuySellVolume':'Domestic_Net_Volume'})
+                smt = smt1.get('data')
+                popdata = ['nextTime', 'quote', 's', 'session']
+                for a in popdata:
+                    smt.pop(a, None)
+                smt = pd.DataFrame(smt)
+                smt['t'] = pd.to_datetime(smt['t'],unit='s').dt.strftime('%Y/%m/%d')
+                trade_date_list = list(smt['t'])
+                smt_2 = pd.DataFrame(smt2.get('data'))
+                break
+            except Exception:
+                pass
+        try:
+            smt_2 = smt_2[smt_2.date.isin(trade_date_list)]
+            smt_2 = smt_2.drop(columns=['code', 'dealerBuyVolume', 'dealerSellVolume', 'dealerNetBuySellVolume', 'foreignBuyVolume', 'foreignSellVolume', 'domesticBuyVolume', 'domesticSellVolume', 'totalNetBuySellVolume'])
+            smt = smt.set_index('t').join(smt_2.set_index('date'))
+        except Exception:
+            smt['foreignNetBuySellVolume'] = 0
+            smt['domesticNetBuySellVolume'] = 0
+        smt_3 = pd.DataFrame(smt3.get('data'))
+        try:
+            smt_3 = smt_3[smt_3.date.isin(trade_date_list)]
+            smt_3['Net_Margin'] = smt_3['marginBuy']-smt_3['marginSell']
+            smt_3 = smt_3.drop(columns=['symbolId', 'marginBuy', 'marginSell', 'marginRemaining', 'marginUsedPercent', 'shortSell', 'shortBuy', 'shortRemaining', 'shortMarginPercent' ])
+            smt = smt.join(smt_3.set_index('date'))
+        except Exception:
+            smt['Net_Margin'] = 0
+        smt = smt.reset_index().fillna(0)
+        smt = smt.sort_values(by='t').reset_index(drop=True)
+        smt = smt.rename(columns=df_columns)
+        smt['Stock_ID'] = stock
+        raw_data = pd.read_csv(r'/home/justin/Documents/Stocks/Stock_data/TW_{}.csv'.format(stock))
+        raw_data = raw_data.append(smt).fillna(0).reset_index(drop=True)
+        raw_data.to_csv(r'/home/justin/Documents/Stocks/Stock_data/TW_{}.csv'.format(stock), index=False, header=True)
+        print('TW_{} data created successfully, {} out of {} to go.'.format(stock, stock_list.index(stock)+1, len(stock_list)))
+        time.sleep(0.05)
