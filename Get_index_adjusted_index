@@ -1,0 +1,84 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Nov  6 19:46:09 2020
+
+@author: Susan
+"""
+
+import pandas as pd
+import numpy as np
+import requests
+import json
+import csv
+import time
+import datetime
+import calendar
+import os
+from bs4 import BeautifulSoup as bs
+
+def get_webmsg_twse_index_less_ETF_3big(year, month, day):
+    while True:
+        try:
+            date = str(year)+'{0:0=2d}'.format(month)+'{0:0=2d}'.format(day)
+            url_3_big = 'https://www.twse.com.tw/fund/TWT38U?response=json&date='+date+'&_='
+            res_3_big = requests.get(url_3_big)
+            soup_3_big = bs(res_3_big.text, 'html.parser')
+            smt_3_big = json.loads(soup_3_big.text)     #convert data into json
+            return smt_3_big
+        except Exception:
+            time.sleep(10)
+
+# stock_list = pd.read_csv(r'C:\Users\cheng\Desktop\Stocks\Stocks_data\StockList_TWSE.csv')
+stock_list = pd.read_csv(r'/home/justin/Documents/Stocks/Stock_data/StockList_TWSE.csv')
+stocklist = list(stock_list['Code'])
+
+stock_database = {}
+for stocks in stocklist:
+    s_1 = str(stocks)
+    s_2 = pd.read_csv(r'/home/justin/Documents/Stocks/Stock_data/TW_{}.csv'.format(stocks), index_col='Time', parse_dates=True)
+    stock_database[s_1] = s_2
+
+
+raw_data = pd.read_csv(r'/home/justin/Documents/Stocks/TWSE_Index.csv')
+raw_data['Time'] = pd.to_datetime(raw_data['Time'])
+raw_data = raw_data.set_index('Time')
+
+now = datetime.datetime.now()
+for start_date_y in range(2016, 2021):
+    for start_date_m in range(1, 13):
+        for start_date_d in range(1, calendar.monthrange(start_date_y, start_date_m)[1]+1):
+            # start_date_y = end_date_y = 2017
+            # start_date_m = end_date_m = 9
+            # start_date_d = end_date_d = 27
+            end_date_y = start_date_y
+            end_date_m = start_date_m
+            end_date_d = start_date_d
+            date_time = datetime.datetime(year=start_date_y, month=start_date_m, day=start_date_d)
+            try:
+                stocklist = list(stock_list['Code'])
+                stocklist = [str(x) for x in stocklist]
+                smt2 = get_webmsg_twse_index_less_ETF_3big(start_date_y, start_date_m, start_date_d)
+                # time.sleep(10)
+                smt_list = smt2.get('fields')
+                smt2 = smt2.get('data')
+                df = pd.DataFrame(smt2, columns=smt_list)
+                df = df.iloc[:, 1:6]
+                df = df.rename(columns={'證券代號':'Stock_ID'})
+                df['買賣超股數'] = [x.replace(',', '') for x in df['買賣超股數']]
+                df['Stock_ID'] = [x.replace('  ', '') for x in df['Stock_ID']]
+                df['買賣超股數'] = df['買賣超股數'].astype(int)
+                df = df[df.Stock_ID.isin(stocklist)]
+                stocklist = list(df['Stock_ID'])
+                df = df.set_index('Stock_ID')
+                for stock in stocklist:
+                    try:
+                        df.loc[stock, 'C'] = stock_database[str(stock)].loc[date_time, 'Open':'Close'].values.mean()
+                    except Exception:
+                        df.loc[stock, 'C'] = 0
+                df['Net_Value'] = (df['C']*df['買賣超股數'])
+                raw_data.loc[date_time, 'Adjusted_Foreign_net'] = round(df['Net_Value'].sum()/100000000, 2)
+                # print(round(df['Net_Value'].sum()/100000000, 2))
+            except Exception:
+                pass
+
+raw_data.to_csv(r'/home/justin/Documents/Stocks/TWSE_Index.csv', index=True, header=True)
