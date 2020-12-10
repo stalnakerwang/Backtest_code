@@ -21,11 +21,11 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 
 
-#checking in all model scores
-classification_models = {}
-
 #import dataset
 dataset = pd.read_csv('DATA_NAME_FILE_HERE.csv')
+
+#checking in all model scores
+classification_models = {}
 
 #Setting split of train test size
 test_size = 0.25
@@ -48,6 +48,7 @@ classifier.fit(X_train, y_train)
 y_pred = classifier.predict(X_test)
 #creating confusion maxtriz
 cm = confusion_matrix(y_test, y_pred)
+print('Logistic regression')
 print(cm)
 acc_score = accuracy_score(y_test, y_pred)
 classification_models['logsitic_regression_classifier'] = acc_score
@@ -64,6 +65,7 @@ for a in range (5, 20, 5):
     y_pred = classifier.predict(X_test)
 #creating confusion maxtriz
     cm = confusion_matrix(y_test, y_pred)
+    print('KNN classifier_',str(a),'_n_neighbors')
     print(cm)
     acc_score = accuracy_score(y_test, y_pred)
     classification_models['KNN_classifier_'+str(a)+'_neighbors'] = acc_score
@@ -72,7 +74,7 @@ for a in range (5, 20, 5):
     print('Total Time:', round(take_time, 4), 'seconds')
 
 #SVM classifier
-kernel_style = ['linear', 'poly', 'rbf', 'sigmoid', 'precomputed']
+kernel_style = ['linear', 'poly', 'rbf', 'sigmoid']
 for b in kernel_style:
     start_time=time.time()
     classifier = SVC(kernel = b)
@@ -81,6 +83,7 @@ for b in kernel_style:
     y_pred = classifier.predict(X_test)
 #creating confusion maxtriz
     cm = confusion_matrix(y_test, y_pred)
+    print('SVM classifier_',str(b),'_style')
     print(cm)
     acc_score = accuracy_score(y_test, y_pred)
     classification_models['SVM_'+b+'_style'] = acc_score
@@ -96,6 +99,7 @@ classifier.fit(X_train, y_train)
 y_pred = classifier.predict(X_test)
 #creating confusion maxtriz
 cm = confusion_matrix(y_test, y_pred)
+print('Naive Bayes classifier')
 print(cm)
 acc_score = accuracy_score(y_test, y_pred)
 classification_models['Naive_Bayes_classifier'] = acc_score
@@ -114,6 +118,7 @@ for c in dtc_style:
     y_pred = classifier.predict(X_test)
 #creating confusion maxtriz
     cm = confusion_matrix(y_test, y_pred)
+    print('Decision tree classifier_',str(c),'_style')
     print(cm)
     acc_score = accuracy_score(y_test, y_pred)
     classification_models['Decision_tree_'+c+'_style'] = acc_score
@@ -131,6 +136,7 @@ for c in dtc_style:
         y_pred = classifier.predict(X_test)
 #creating confusion maxtriz
         cm = confusion_matrix(y_test, y_pred)
+        print('Random forest classifier_',str(c),'_style_',str(d),'_estimators')
         print(cm)
         acc_score = accuracy_score(y_test, y_pred)
         classification_models['Random_forest_'+c+'_style_'+str(d)+'_trees'] = acc_score
