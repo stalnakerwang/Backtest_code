@@ -1,0 +1,69 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+import time
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import confusion_matrix, accuracy_score
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.naive_bayes import GaussianNB
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+
+#import dataset
+dataset = pd.read_csv('Data.csv')
+
+
+
+#checking in all model scores
+classification_models = {}
+
+#classification model的問題在於random_sate 不一樣, 結果會不相同, 我選擇採用多測嘗試取得最佳起始點
+for z in range(0, b): ##b = 要測幾個random state
+    X_train = dataset.iloc[:c, n:-1].values ## c = 利用多少參數當第一次樣本訓練的base  ## n= 第幾欄開始才是重要需要回測的資料
+    y_train = dataset.iloc[:c, -1].values
+    random_state_results = {}
+    for a in range(c, len(dataset)):
+        X_test = dataset.iloc[a:a+1, n:-1].values
+        y_test = dataset.iloc[a:a+1, -1].values
+        
+        ###這邊可以開啟 嘗試 scaling###
+        sc = StandardScaler()
+        X_train = sc.fit_transform(X_train)
+        X_test = sc.transform(X_test)
+        ###不想執行scaling可以關起來###
+        
+        ###選擇你要使用的model###
+        classifier = RandomForestClassifier(n_estimators = 100, criterion = 'entropy', random_state=z)
+        #######
+        classifier.fit(X_train, y_train)
+        
+        ###預測下一次結果###
+        y_pred = classifier.predict(X_test)
+        ######
+        
+        ###觀看結果矩陣###
+        cm = confusion_matrix(y_test, y_pred)
+        print('Random forest classifier_random_state:'+str(z))
+        print(cm)
+        ###不想觀看可以直接關起來###
+        
+        ###準確率 （因為只測下一個結果, 要馬1 要馬0)###
+        acc_score = accuracy_score(y_test, y_pred)
+        random_state_results['Day_'+str(a+1)] = acc_score
+        ######
+        
+        ###測完之後把這組參數加入母體裡面進行下一組參數的測試###
+        X_train = np.concatenate((X_train, X_test), axis=0)
+        y_train = np.concatenate((y_train, y_test), axis=0)
+        ######
+     
+    ###把結果加入最終dict看結果
+    classification_models['Random_state:'+str(z)] = random_state_results
+
+###看哪一個random_state的準確率最高
+highest_acc = []
+for z in range(0, b):
+    highest_acc.append(np.mean(list(classification_models['Random_state:'+str(z)].values())))
